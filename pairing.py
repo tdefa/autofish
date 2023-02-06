@@ -225,16 +225,6 @@ if __name__ == "__main__":
     dico_matrix_transform[source_folder][target_folder][pos0]['spots_0_colocalized'] = spots_0_colocalized
     dico_matrix_transform[source_folder][target_folder][pos0]['new_spots_1_colocalized'] = new_spots_1_colocalized
 
-print(np.mean(list_distance))
-0.4197150673924693
-fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
-fig.suptitle(f'{ref_round}_{round}_{pos}', fontsize=20, x=0.1, ha='left')
-sns.kdeplot(x=list_distance, cumulative=False)
-ax.set_ylim(ymin=0)
-ax.set_xlim(left=0, right=1)
-plt.show()
-print(np.median(list_distance))
-0.36604339864443086
 
 
 
