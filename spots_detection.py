@@ -35,7 +35,6 @@ def compute_spot_detection_of_folder(path_to_folder = "/media/tom/T7/2023-01-19-
                                      mode = "bead"):
 
     """
-
     Args:
         path_to_folder (str): path to folder containg all the round folder
         channel (str): channel to analyse
@@ -50,9 +49,7 @@ def compute_spot_detection_of_folder(path_to_folder = "/media/tom/T7/2023-01-19-
         get_nb_spots_per_cluster ():
         subpixel_loc ():
         spot_radius ():
-
     Returns:
-
     """
 
     dico_detection = {}

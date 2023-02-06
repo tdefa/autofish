@@ -13,7 +13,6 @@ import numpy as np
 from spots_detection import compute_spot_detection_of_folder, get_reference_dico
 from tqdm import tqdm
 from plots import  plot_beads_image_folder, plot_beads_matching_image_folder
-
 from point_cloud_registration import compute_transformation_matrix_folder
 
 
@@ -93,10 +92,10 @@ if __name__ == '__main__':
     #### Compute the Transformation between round
 
     dico_matrix_transform = compute_transformation_matrix_folder(
-        dico_bead_detection,
-        transform_method="affine_cpd",
-        voxel_size=[0.3, 0.103, 0.103],
-        max_dist=0.5,
+        dico_detection = dico_bead_detection,
+        transform_method="rigid",
+        voxel_size=[0.3, 0.108, 0.108],
+        max_dist=2,
         first_regex_check='r',
     )
 
@@ -161,10 +160,22 @@ if __name__ == '__main__':
         subpixel_loc = True,
         spot_radius = tuple(args.spot_radius_bead),
         mode = "bead")
-    np.save(args.rounds_folder + "/final_spots_detection", dico_bead_detection)
+    np.save(args.rounds_folder + "/final_spots_detection", final_spots_detection)
 
 
-
+    plot_beads_image_folder(final_spots_detection,
+                            first_regex_check="r",
+                            channel=args.spots_channel,
+                            min_distance="",
+                            psf="",
+                            folder_patho=args.rounds_folder,
+                            radius=9,
+                            linewidth=2,
+                            fill=False,
+                            figsize=(20, 20),
+                            fontsize_legend=8,
+                            folder_name = 'rna_detection'
+                            )
 
 
 

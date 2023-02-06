@@ -22,6 +22,18 @@ def compute_transformation_matrix_folder(
     max_dist = 0.5,
     first_regex_check = 'r',
     ):
+    """
+
+    Args:
+        dico_detection:
+        transform_method:
+        voxel_size:
+        max_dist:
+        first_regex_check:
+
+    Returns:
+
+    """
 
 
     dico_matrix_transform = {}
@@ -45,19 +57,17 @@ def compute_transformation_matrix_folder(
             print(list_image1)
             print(source_folder)
             print(target_folder)
-            for im_name0 in list_image0:
-                pos0 = im_name0.split('_')[1]
-                for im_name1 in list_image1:
-                    pos1 = im_name1.split('_')[1]
+            for pos0 in list_image0:
+                for pos1 in list_image1:
                     if pos0 != pos1:
                         continue
                     print((pos0, pos1))
                     dico_matrix_transform[source_folder][target_folder][pos0] = {}
-                    bead_subpixel0 = dico_folder_round0[im_name0]["subpixel_spots"]
-                    bead_subpixel1 = dico_folder_round1[im_name1]["subpixel_spots"]
+                    bead_subpixel0 = dico_folder_round0[pos0]["subpixel_spots"]
+                    bead_subpixel1 = dico_folder_round1[pos0]["subpixel_spots"]
 
-                    R, t, s, error_before_transformation, error_after_transformation,  spots_0_colocalized, new_spots_1_colocalized \
-                        = compute_rotation_translation(sub_sp0 = bead_subpixel0,
+                    R, t, s, error_before_transformation, error_after_transformation,  spots_0_colocalized, spots_1_colocalized,  new_spots_1_colocalized = compute_rotation_translation(
+                        sub_sp0 = bead_subpixel0,
                                                  sub_sp1 = bead_subpixel1,
                                                  transform_method=transform_method,
                                                  voxel_size=voxel_size,
@@ -68,6 +78,7 @@ def compute_transformation_matrix_folder(
                     dico_matrix_transform[source_folder][target_folder][pos0]['error_before_transformation'] = error_before_transformation
                     dico_matrix_transform[source_folder][target_folder][pos0]['error_after_transformation'] = error_after_transformation
                     dico_matrix_transform[source_folder][target_folder][pos0]['spots_0_colocalized'] = spots_0_colocalized
+                    dico_matrix_transform[source_folder][target_folder][pos0]['spots_1_colocalized'] = spots_1_colocalized
                     dico_matrix_transform[source_folder][target_folder][pos0]['new_spots_1_colocalized'] = new_spots_1_colocalized
                     dico_matrix_transform[source_folder][target_folder][pos0]['transform_method'] = transform_method
     return dico_matrix_transform
@@ -80,7 +91,7 @@ def compute_rotation_translation(sub_sp0,
                                  sub_sp1,
                                  transform_method = "affine_cpd",
                                  voxel_size = [0.3, 0.103, 0.103],
-                                 max_dist = 0.5):
+                                 max_dist = None):
 
 
 
@@ -96,6 +107,7 @@ def compute_rotation_translation(sub_sp0,
     distances = distances[distances < max_dist]
     #indices_1 = indices_1[distances < max_dist]
     #indices_2 = indices_2[distances < max_dist]
+    print(f'number of spots {len(spots_0_colocalized)}')
 
     error_before_transformation = mean_absolute_error(spots_0_colocalized,
                                                       spots_1_colocalized,
@@ -105,7 +117,7 @@ def compute_rotation_translation(sub_sp0,
         reg = RigidRegistration(**{'X': spots_0_colocalized, 'Y':spots_1_colocalized })
         reg.register()
         R, t, s = reg.get_registration_parameters()
-        new_sub_sp1_pair = reg.transform_point_cloud(spots_1_colocalized)
+        new_spots_1_colocalized = reg.transform_point_cloud(spots_1_colocalized)
     elif transform_method == "affine_cpd":
 
         reg = AffineRegistration(**{'X': spots_0_colocalized, 'Y':spots_1_colocalized })
@@ -121,7 +133,7 @@ def compute_rotation_translation(sub_sp0,
                                                       multioutput='raw_values')
     print(f'error_after_transformation {error_after_transformation}')
 
-    return R, t, s, error_before_transformation, error_after_transformation, spots_0_colocalized, new_spots_1_colocalized
+    return R, t, s, error_before_transformation, error_after_transformation, spots_0_colocalized, spots_1_colocalized, new_spots_1_colocalized
 
 
 
@@ -152,7 +164,7 @@ if __name__ == "__main__":
     distances = distances[distances < max_dist]
     #indices_1 = indices_1[distances < max_dist]
     #indices_2 = indices_2[distances < max_dist]
-
+    print(f'number of spots {len(spots_0_colocalized)}')
     error_before_transformation = mean_absolute_error(spots_0_colocalized,
                                                       spots_1_colocalized,
                                                       multioutput='raw_values')
