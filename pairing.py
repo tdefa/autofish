@@ -43,122 +43,119 @@ plt.rcParams['ytick.labelsize'] = 30
 plt.rc_context({"axes.labelsize" : 45,})
 
 
-def closest_point_index(points, target):
-    #print(f"index  {index_axes}")
-    closest_point = min(points, key=lambda p: distance.euclidean(p, target)) #(p[0] - tz) ** 2 + (p[1] - tx) ** 2 + (p[2] - ty) ** 2)
-    index = [i for i, x in enumerate(points) if np.sum(closest_point == x) == 3]
-    min_dist = distance.euclidean(closest_point, target)
-    min_dist_0 = np.abs(closest_point[0] -  target[0])
-    min_dist_1 = np.abs(closest_point[1] -  target[1])
-    min_dist_2 = np.abs(closest_point[2] -  target[2])
-    if len(index) > 1:
-        #print(index)
-        if points[index[0]].all() ==points[index[1]].all():
-            raise(Exception("coordinate not unique"))
-            #print("coordinate not unique")
-        else:
-            raise(Exception("multiple equal neirest neigbor"))
-    return index[0], closest_point, min_dist, [min_dist_0, min_dist_1,  min_dist_2]
 
 
 
 def pairit(sp0_ref, sp1, max_distance = None):
-    nb_count = 0
     list_couple_index_sp0_ref = []
     list_couple_index_sp1 = []
-
-    list_distance = []
-    list_distance_coord = []
     sp0_ref_pair_order = []
     sp1_pair_order = []
+    list_distance = []
+
     print('in_pair_it')
-    for index_sp0 in tqdm(range(len(sp0_ref))):
-        index_nn_sp1_for_sp0, closest_point_sp1_0, min_distsp1_0, min_list = closest_point_index(
-            points=sp1,
-            target = sp0_ref[index_sp0] )  # compute the distance to the neirest neibo
-        index_nn_sp0_for_sp1, closest_point_sp0_1, min_distsp0_1, min_list = closest_point_index(
-                                    points = sp0_ref,
-                                    target = sp1[index_nn_sp1_for_sp0])
-        if index_sp0 == index_nn_sp0_for_sp1 and min_distsp0_1 < max_distance:  # check that mutual neirest neigbhbor plus infirior to a dist threshol
-            nb_count += 1
-            list_couple_index_sp0_ref.append(index_sp0)
-            list_couple_index_sp1.append(index_nn_sp1_for_sp0)
+    from sklearn.neighbors import NearestNeighbors
+    nbrs_sp0 = NearestNeighbors(algorithm='ball_tree').fit(sp0_ref)
+    neigh_dist_sp0_sp1, neigh_ind_sp0_sp1 = nbrs_sp0.radius_neighbors(X=sp1,
+                                                                      radius=max_distance,
+                                                                      return_distance=True,
+                                                                      sort_results=True)
+    nbrs_sp1 = NearestNeighbors(algorithm='ball_tree').fit(sp1)
+    neigh_dist_sp1_sp0, neigh_ind_sp1_sp0 = nbrs_sp1.radius_neighbors(X=sp0_ref, radius=max_distance,
+                                                                      return_distance=True, sort_results=True)
 
-            list_distance.append(min_distsp0_1)
-            list_distance_coord.append(min_list)
-            sp0_ref_pair_order.append(closest_point_sp0_1)
-            sp1_pair_order.append(closest_point_sp1_0)
-    print(nb_count)
-    return list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order,  sp1_pair_order, list_distance, list_distance_coord
-
-
-def compute_nn_couple(sp0_ref, sp1, R_0_1, t_0_1, s_0_1,
-                    transform_method =  'rigid',
-                    mean_substraction = True,
-                    max_distance = 10,
-                      scale_z_x_y = np.array([0.300, 0.103, 0.103])):
-    """
-
-    Args:
-        sp0_ref (array): spots reference
-        sp1 (array): spots that are rotate translate
-        R_0_1:
-        t_0_1:
-        s_0_1:
-        transform_method:
-        mean_substraction:
-        max_distance:
-        scale_z_x_y: array
-        index_axes:
-
-    Returns:
-
-    """
-    assert transform_method in ["affine_cpd", "rigid_cpd", 'rigid', "rigid_inverse" "all"]
-    sp0_ref = np.array(sp0_ref)
-    sp1 = np.array(sp1)
+    for index_sp0 in range(len(sp0_ref)):
+        if len(neigh_ind_sp1_sp0[index_sp0]) > 0:
+            if neigh_ind_sp0_sp1[neigh_ind_sp1_sp0[index_sp0][0]][0] == index_sp0:
+                list_couple_index_sp0_ref.append(index_sp0)
+                list_couple_index_sp1.append(neigh_ind_sp1_sp0[index_sp0][0])
+                sp0_ref_pair_order.append(sp0_ref[index_sp0])
+                sp1_pair_order.append(sp1[neigh_ind_sp1_sp0[index_sp0][0]])
+                list_distance.append(neigh_dist_sp1_sp0[index_sp0][0])
 
 
-    if transform_method == "affine_cpd":
-        reg = AffineRegistration(**{'X': sp0_ref, 'Y': sp1})
-        reg.B = R_0_1
-        reg.t = t_0_1
-        sp1 = np.array(sp1)
-        sp1  = reg.transform_point_cloud(sp1)
-        print("affine_cpd")
-    else:
-        raise(Exception(f' {transform_method} is not implemented'))
-    sp0_ref = sp0_ref * scale_z_x_y
-    sp1 = sp1 * scale_z_x_y
-    if not mean_substraction:
-        list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order, sp1_pair_order, list_distance, list_distance_coord = pairit(sp0_ref, sp1,
-                                                                                                     return_pairs=False,
-                                                                                                     max_distance = max_distance)
-        return list_couple_index, list_couple_translated_spots, list_distance
-
-    else:
-        assert mean_substraction
-        sp0_ref_pair_order, sp1_pair_order = pairit(sp0_ref, sp1, return_pairs=True, max_distance = max_distance)
-        mean_raw = np.mean(sp1_pair_order - sp0_ref_pair_order, axis=0)
-        sp1 = sp1 - mean_raw
-        print(f"mean raw removal{mean_raw}")
-        list_couple_index, list_couple_translated_spots, list_distance, list_distance_coord = pairit(sp0_ref, sp1, return_pairs=False)
-        return list_couple_index, list_couple_translated_spots, list_distance, mean_raw, list_distance_coord
+    print(np.median(list_distance))
+    print(len(list_distance))
+    return list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order,  sp1_pair_order, list_distance
 
 
+
+
+def compute_pair_folder(
+        dico_matrix_transform,
+        final_spots_detection,
+        scale_z_x_y=np.array([270, 108, 108]),
+        max_distance=1000,
+        ref_round = "r1",
+        mean_substraction = True,
+        plot_hist = True,
+        path_folder_save_plot = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test3/histogram"
+        ):
+    Path(path_folder_save_plot).mkdir(parents=True, exist_ok=True)
+    dico_matched_rna = {}
+
+    for round in final_spots_detection:
+        dico_matched_rna[round] = {}
+        for pos in final_spots_detection[round]:
+            dico_matched_rna[round][pos] = {}
+            sp0_ref = final_spots_detection[ref_round][pos]['subpixel_spots'][0]
+            sp1 = final_spots_detection[round][pos]['subpixel_spots'][0]
+            R_1_2 = dico_matrix_transform[ref_round][round][pos]['R']
+            t_1_2 = dico_matrix_transform[ref_round][round][pos]['t']
+            s_1_2 = dico_matrix_transform[ref_round][round][pos]['s']
+            transform_method = dico_matrix_transform[ref_round][round][pos]['transform_method']
+            if t_1_2 is None:
+                continue
+
+            if transform_method == "affine_cpd":
+                reg = AffineRegistration(**{'X': sp0_ref, 'Y': sp1})
+                reg.B = R_1_2
+                reg.t = t_1_2
+                sp0_ref = np.array(sp0_ref)
+                sp1 = np.array(sp1)
+                sp1 = reg.transform_point_cloud(sp1)
+                sp0_ref = sp0_ref * scale_z_x_y
+                sp1 = sp1 * scale_z_x_y
+
+            list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order, sp1_pair_order, list_distance =  pairit(sp0_ref=sp0_ref,
+                                                                                                                          sp1=sp1,
+                                                                                                                          max_distance=max_distance)
+
+            if mean_substraction:
+                raise(Exception('mean_substraction not implemented yet'))
+
+            sp0_ref_pair_order = np.array(sp0_ref_pair_order) / scale_z_x_y
+            sp1_pair_order = np.array(sp1_pair_order) / scale_z_x_y
+
+            dico_matched_rna[round][pos]["list_couple_index_sp0_ref"] = list_couple_index_sp0_ref
+            dico_matched_rna[round][pos]["list_couple_index_sp1"] = list_couple_index_sp1
+            dico_matched_rna[round][pos]["sp0_ref_pair_order"] = sp0_ref_pair_order
+            dico_matched_rna[round][pos]["sp1_pair_order"] = sp1_pair_order
+            dico_matched_rna[round][pos]["list_distance"] = list_distance
+            dico_matched_rna[round][pos]["ref_round"] = ref_round
+
+
+            if plot_hist:
+
+                fig, ax = plt.subplots(figsize=(16, 10))    # plotting density plot for carat using distplot()
+                fig.suptitle(f'{ref_round}_{round}_{pos}_median_{np.median(list_distance)}', fontsize=20, x =0.1, ha='left')
+                sns.kdeplot(x=list_distance, cumulative=False)
+                ax.set_ylim(ymin=0)
+                ax.set_xlim(left = 0, right= max_distance)
+                fig.savefig(path_folder_save_plot + "/" + f"{ref_round}_{round}_{pos}")
+    return dico_matched_rna
 
 
 if __name__ == "__main__":
 
-    dico_bead_detection = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test/dico_bead_detection.npy",
+
+    dico_matrix_transform = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test3/dico_matrix_transform(800, 600, 600).npy",
             allow_pickle=True).item()
-    dico_matrix_transform = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test/dico_matrix_transform.npy",
-            allow_pickle=True).item()
-    final_spots_detection = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test/final_spots_detection.npy",
+    final_spots_detection = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3/final_spots_detection(800, 600, 600).npy",
             allow_pickle=True).item()
 
 
-    scale_z_x_y = np.array([0.300, 0.103, 0.103])
+    scale_z_x_y = np.array([270, 108, 108])
     ref_round = "r1"
     dico_spots_detection = final_spots_detection
     dico_matrix_transform = dico_matrix_transform
@@ -166,23 +163,24 @@ if __name__ == "__main__":
     plot_hist = True
 
 
-    path_folder_image = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test/histogram"
+    path_folder_image = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test3/histogram"
     Path(path_folder_image).mkdir(parents=True, exist_ok=True)
     dico_matched_rna = {}
-
 
     for round in final_spots_detection:
         dico_matched_rna[round] = {}
         for pos in final_spots_detection[round]:
-            round = "r2"
-            pos = 'pos1'
+            pos = "pos0"
+            round = "r15"
             dico_matched_rna[round][pos] = {}
-            sp0_ref = final_spots_detection[ref_round][pos]['subpixel_spots']
-            sp1 = final_spots_detection[round][pos]['subpixel_spots']
+            sp0_ref = final_spots_detection[ref_round][pos]['subpixel_spots'][0]
+            sp1 = final_spots_detection[round][pos]['subpixel_spots'][0]
             R_1_2 = dico_matrix_transform[ref_round][round][pos]['R']
             t_1_2 = dico_matrix_transform[ref_round][round][pos]['t']
             s_1_2 = dico_matrix_transform[ref_round][round][pos]['s']
             transform_method = dico_matrix_transform[ref_round][round][pos]['transform_method']
+            if t_1_2 is None:
+                continue
 
 
             if transform_method == "affine_cpd":
@@ -190,11 +188,46 @@ if __name__ == "__main__":
                 reg.B = R_1_2
                 reg.t = t_1_2
                 sp0_ref = np.array(sp0_ref)
+                sp1 = np.array(sp1)
                 sp1 = reg.transform_point_cloud(sp1)
                 sp0_ref = sp0_ref * scale_z_x_y
                 sp1 = sp1 * scale_z_x_y
+
+
+
             else:
                 raise (Exception(f' {transform_method} is not implemented yet'))
+            max_distance = 1000
+
+            list_couple_index_sp0_ref = []
+            list_couple_index_sp1 = []
+            list_distance = []
+            sp0_ref_pair_order = []
+            sp1_pair_order = []
+            print('in_pair_it')
+            from sklearn.neighbors import NearestNeighbors
+            nbrs_sp0 = NearestNeighbors(algorithm='ball_tree').fit(sp0_ref)
+            neigh_dist_sp0_sp1, neigh_ind_sp0_sp1 = nbrs_sp0.radius_neighbors(X=sp1,
+                                                                              radius=max_distance,
+                                                                              return_distance=True,
+                                                                              sort_results=True)
+            nbrs_sp1 = NearestNeighbors(algorithm='ball_tree').fit(sp1)
+            neigh_dist_sp1_sp0, neigh_ind_sp1_sp0 = nbrs_sp1.radius_neighbors(X=sp0_ref, radius=max_distance,
+                                                                              return_distance=True, sort_results=True)
+
+            for index_sp0 in range(len(sp0_ref)):
+                if len(neigh_ind_sp1_sp0[index_sp0]) > 0:
+                    if neigh_ind_sp0_sp1[neigh_ind_sp1_sp0[index_sp0][0]][0] == index_sp0:
+                        list_couple_index_sp0_ref.append(index_sp0)
+                        list_couple_index_sp1.append(neigh_ind_sp1_sp0[index_sp0][0])
+                        list_distance.append(neigh_dist_sp1_sp0[index_sp0][0])
+                        sp0_ref_pair_order.append(sp0_ref[index_sp0])
+                        sp1_pair_order.append(sp1[neigh_ind_sp1_sp0[index_sp0][0]])
+
+
+            print(np.median(list_distance))
+            print(len(list_distance))
+
 
             list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order,  sp1_pair_order, list_distance, list_distance_coord = pairit(
                             sp0_ref=sp0_ref,
@@ -216,8 +249,8 @@ if __name__ == "__main__":
 
                 sns.kdeplot(x=list_distance, cumulative=False)
                 ax.set_ylim(ymin=0)
-                ax.set_xlim(left = 0, right= 1)
-                fig.savefig(path_folder_image + "/" + str(beads_signal_path)[-12:-8])
+                ax.set_xlim(left = 0, right= 1000)
+                fig.savefig(path_folder_image + "/" + f"{ref_round}_{round}_{pos}")
                 print(np.mean(list_distance))
 
     list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order, sp1_pair_order, list_distance, list_distance_coord

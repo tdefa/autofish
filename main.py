@@ -13,7 +13,6 @@ import numpy as np
 from spots_detection import compute_spot_detection_of_folder, get_reference_dico
 from tqdm import tqdm
 from plots import  plot_beads_image_folder, plot_beads_matching_image_folder
-from point_cloud_registration import compute_transformation_matrix_folder
 
 
 # Press the green button in the gutter to run the script.
@@ -21,7 +20,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--rounds_folder", help="folder with all the rounds",
-                        default="/media/tom/T7/2023-01-19-PAPER-20-rounds/test")
+                        default="/media/tom/T7/2023-01-19-PAPER-20-rounds/round_impair")
                         #default = "/media/tom/T7/2023-01-19-PAPER-20-rounds/images")
     parser.add_argument("--beads_channel",
                         default="ch1")
@@ -35,95 +34,53 @@ if __name__ == '__main__':
                         ,
                         default=np.array([300, 108, 108])
                         )
-
     ### bead detection
     parser.add_argument("--spot_radius_rna", help="",
-                        default=np.array([900, 300, 300])
+                        default=np.array([400, 200, 200])
                         )
     parser.add_argument("--reference_mode", default="median")
-
     ### spots detection
-
-
     parser.add_argument("--spot_radius_bead", help="",
-                        default=np.array([600, 300, 300])
+                        default=np.array([800, 600, 600])
                         )
+    ## painring
+    parser.add_argument("--ref_round",
+                        default="r1")
+    #task_to_do
+    parser.add_argument("--detect_beads", help="", type = int,
+                        default=1)
+    parser.add_argument("--compute_transform", help="",type = int,
+                        default=0)
+    parser.add_argument("--plot_beads",type = int,
+                        help="", default=0)
 
+    parser.add_argument("--detect_spots", help="",type = int,
+                        default=1)
+    parser.add_argument("--plot_spots", help="",type = int,
+                        default=0)
+    parser.add_argument("--pairing", help="",type = int,
+                        default=0)
+    parser.add_argument("--pairing_plots_analysis", help="",type = int,
+                        default=0)
+    parser.add_argument("--pairing_plots_spots", help="",type = int,
+                        default=0)
     parser.add_argument("--host", default='127.0.0.2')
     parser.add_argument("--mode", default='client')
     parser.add_argument("--port", default=52162)
     args = parser.parse_args()
+    print(args)
+    path_folder_save_plot = args.rounds_folder + '/histogram'
 
 ############# detect the bead store in in a dico [round][image_name] = spots coordiante
 
-    dico_bead_detection  = compute_spot_detection_of_folder(
-        path_to_folder=args.rounds_folder,
-        channel = args.beads_channel,
-        Key_world = "os",
-        min_distance = [5, 7, 7],
-        sigma = [1.35, 1.35, 1.35],
-        threshold = None,
-        reference_number_of_spot = None,
-        beta = 1,
-        alpha = 0.5,
-        voxel_size = tuple(args.voxel_size),
-        get_nb_spots_per_cluster = False,
-        subpixel_loc = True,
-        spot_radius = tuple(args.spot_radius_bead),
-        mode = "bead")
+    if args.detect_beads:
+        print("detect_beads")
 
-    np.save(args.rounds_folder + "/dico_bead_detection", dico_bead_detection)
-    dico_bead_detection = np.load(args.rounds_folder + "/dico_bead_detection.npy", allow_pickle=True).item()
-
-    plot_beads_image_folder(dico_bead_detection,
-                            first_regex_check="r",
-                            channel=args.beads_channel,
-                            min_distance=[5, 7, 7],
-                            psf=[1.35, 1.35, 1.35],
-                            folder_patho=args.rounds_folder,
-                            radius=9,
-                            linewidth=2,
-                            fill=False,
-                            figsize=(20, 20),
-                            fontsize_legend=8,
-                            )
-
-
-    #### Compute the Transformation between round
-
-    dico_matrix_transform = compute_transformation_matrix_folder(
-        dico_detection = dico_bead_detection,
-        transform_method="rigid",
-        voxel_size=[0.3, 0.108, 0.108],
-        max_dist=2,
-        first_regex_check='r',
-    )
-
-    np.save(args.rounds_folder + "/dico_matrix_transform", dico_matrix_transform)
-    dico_matrix_transform = np.load(args.rounds_folder + "/dico_matrix_transform.npy", allow_pickle=True).item()
-
-    plot_beads_matching_image_folder(
-        first_regex_check="r",
-        channel="ch1",
-        folder_patho=args.rounds_folder,
-        psf="",
-        min_distance="",
-        round_source="r1",
-        dico_matrix_transform=dico_matrix_transform,
-        radius=6,
-        linewidth=1,
-        fill=False,
-        figsize=(20, 20),
-        fontsize_legend=8)
-
-############## detect the rna with the same number of rna in each images [round][image_name] = spots coordiante
-
-## first spots detection
-
-    first_spots_detection  = compute_spot_detection_of_folder(path_to_folder=args.rounds_folder,
-            channel = args.spots_channel,
+        dico_bead_detection  = compute_spot_detection_of_folder(
+            path_to_folder=args.rounds_folder,
+            channel = args.beads_channel,
             Key_world = "os",
-            min_distance = [4, 4, 4],
+            min_distance = [7, 7, 7],
             sigma = [1.35, 1.35, 1.35],
             threshold = None,
             reference_number_of_spot = None,
@@ -131,68 +88,308 @@ if __name__ == '__main__':
             alpha = 0.5,
             voxel_size = tuple(args.voxel_size),
             get_nb_spots_per_cluster = False,
-            subpixel_loc = False,
+            subpixel_loc = True,
             spot_radius = tuple(args.spot_radius_bead),
             mode = "bead")
 
-    np.save(args.rounds_folder + "/first_spots_detection",
-            first_spots_detection)
-    first_spots_detection = np.load(args.rounds_folder + "/first_spots_detection.npy", allow_pickle="True").item()
+        np.save(args.rounds_folder + "/dico_bead_detection" + str(tuple(args.spot_radius_bead)), dico_bead_detection)
 
 
-    dico_ref_nb_spot_per_position = get_reference_dico(
-        first_dico_detection = first_spots_detection,
-        mode=args.reference_mode)
-
-    ## second spot detection
-    final_spots_detection  = compute_spot_detection_of_folder(
-        path_to_folder=args.rounds_folder,
-        channel = args.spots_channel,
-        Key_world = "pos",
-        min_distance = [4, 4, 4],
-        sigma = [1.35, 1.35, 1.35],
-        threshold = None,
-        reference_number_of_spot = dico_ref_nb_spot_per_position,
-        beta = 1,
-        alpha = 0.5,
-        voxel_size = tuple(args.voxel_size),
-        get_nb_spots_per_cluster = False,
-        subpixel_loc = True,
-        spot_radius = tuple(args.spot_radius_bead),
-        mode = "bead")
-    np.save(args.rounds_folder + "/final_spots_detection", final_spots_detection)
-
-
-    plot_beads_image_folder(final_spots_detection,
-                            first_regex_check="r",
-                            channel=args.spots_channel,
-                            min_distance="",
-                            psf="",
-                            folder_patho=args.rounds_folder,
-                            radius=9,
-                            linewidth=2,
-                            fill=False,
-                            figsize=(20, 20),
-                            fontsize_legend=8,
-                            folder_name = 'rna_detection'
-                            )
+    if args.compute_transform:
+        print('compute_transform')
+        from point_cloud_registration import compute_transformation_matrix_folder
+        dico_bead_detection = np.load(args.rounds_folder + f"/dico_bead_detection{tuple(args.spot_radius_bead)}.npy",
+                                      allow_pickle=True).item()
+        dico_matrix_transform = compute_transformation_matrix_folder(
+            dico_detection = dico_bead_detection,
+            transform_method="affine_cpd",
+            voxel_size=[270, 108, 108],
+            scale = None,
+            max_dist=2,
+            first_regex_check='r',
+            method = 'old'
+        )
+        np.save(args.rounds_folder + "/dico_matrix_transform"+ str(tuple(args.spot_radius_bead)), dico_matrix_transform)
 
 
 
+    if args.plot_beads:
+        print("plot bead")
+        dico_matrix_transform = np.load(
+            args.rounds_folder + f"/dico_matrix_transform{tuple(args.spot_radius_bead)}.npy",
+            allow_pickle=True).item()
+        dico_bead_detection = np.load(args.rounds_folder + f"/dico_bead_detection{tuple(args.spot_radius_bead)}.npy",
+                                      allow_pickle=True).item()
 
-########### compute registation with phase corelation
+        plot_beads_image_folder(dico_bead_detection,
+                                first_regex_check="r",
+                                channel=args.beads_channel,
+                                min_distance=[7, 7, 7],
+                                psf=[1.35, 1.35, 1.35],
+                                folder_patho=args.rounds_folder,
+                                radius=9,
+                                linewidth=2,
+                                fill=False,
+                                figsize=(20, 20),
+                                fontsize_legend=8,
+                                )
 
 
-## compute the number of pair RNA per round
+    #### Compute the Transformation between round
+
+
+        plot_beads_matching_image_folder(
+            first_regex_check="r",
+            channel="ch1",
+            folder_patho=args.rounds_folder,
+            psf="",
+            min_distance="",
+            round_source="r1",
+            dico_transform_spots=dico_matrix_transform,
+            radius=6,
+            linewidth=1,
+            fill=False,
+            figsize=(20, 20),
+            fontsize_legend=8,
+            plot_mode="bead",
+            rescale=True
+        )
+
+############## detect the rna with the same number of rna in each images [round][image_name] = spots coordiante
+
+## first spots detection
+    if args.detect_spots:
+        print("detect_spots")
+        first_spots_detection  = compute_spot_detection_of_folder(path_to_folder=args.rounds_folder,
+                channel = args.spots_channel,
+                Key_world = "os",
+                min_distance = [4, 4, 4],
+                sigma = [1.35, 1.35, 1.35],
+                threshold = None,
+                reference_number_of_spot = None,
+                beta = 1,
+                alpha = 0.5,
+                voxel_size = tuple(args.voxel_size),
+                get_nb_spots_per_cluster = False,
+                subpixel_loc = True,
+                spot_radius = tuple(args.spot_radius_rna),
+                mode = "bead")
+
+        np.save(args.rounds_folder + f"/first_spots_detection{tuple(args.spot_radius_bead)}",
+                first_spots_detection)
+        first_spots_detection = np.load(args.rounds_folder + f"/first_spots_detection{tuple(args.spot_radius_bead)}.npy", allow_pickle="True").item()
+
+
+        dico_ref_nb_spot_per_position = get_reference_dico(
+            first_dico_detection = first_spots_detection,
+            mode=args.reference_mode)
+
+        ## second spot detection
+        final_spots_detection  = compute_spot_detection_of_folder(
+            path_to_folder=args.rounds_folder,
+            channel = args.spots_channel,
+            Key_world = "pos",
+            min_distance = [4, 4, 4],
+            sigma = [1.35, 1.35, 1.35],
+            threshold = None,
+            reference_number_of_spot = dico_ref_nb_spot_per_position,
+            beta = 1,
+            alpha = 0.5,
+            voxel_size = tuple(args.voxel_size),
+            get_nb_spots_per_cluster = False,
+            subpixel_loc = True,
+            spot_radius = tuple(args.spot_radius_rna),
+            mode = "bead")
+        np.save(args.rounds_folder + f"/final_spots_detection{tuple(args.spot_radius_bead)}", final_spots_detection)
+
+    if args.plot_spots:
+        print("plot_spots")
+
+        plot_beads_image_folder(final_spots_detection,
+                                first_regex_check="r",
+                                channel=args.spots_channel,
+                                min_distance="",
+                                psf="",
+                                folder_patho=args.rounds_folder,
+                                radius=9,
+                                linewidth=2,
+                                fill=False,
+                                figsize=(20, 20),
+                                fontsize_legend=8,
+                                folder_name = 'rna_detection'
+                                )
+
+
+    ### pair it
+
+    if args.pairing:
+
+        final_spots_detection = np.load(args.rounds_folder + f"/final_spots_detection{tuple(args.spot_radius_bead)}.npy",
+                                        allow_pickle=True).item()
+        dico_matrix_transform = np.load(
+            args.rounds_folder + f"/dico_matrix_transform{tuple(args.spot_radius_bead)}.npy",
+            allow_pickle=True).item()
+
+        """dico_matrix_transform = np.load(
+            "/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3/dico_matrix_transform(800, 600, 600).npy",
+            allow_pickle=True).item()
+        final_spots_detection = np.load(
+            "/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3/final_spots_detection(800, 600, 600).npy",
+            allow_pickle=True).item()"""
+        from pairing import compute_pair_folder
+
+        dico_matched_rna = compute_pair_folder(
+            dico_matrix_transform,
+            final_spots_detection,
+            scale_z_x_y=np.array([270, 108, 108]),
+            max_distance=1000,
+            ref_round=args.ref_round,
+            mean_substraction=False,
+            plot_hist=True,
+            path_folder_save_plot=path_folder_save_plot
+        )
+        np.save(args.rounds_folder + f"/dico_matched_rna_ref_round{args.ref_round}", final_spots_detection)
+
+
+        all_dico_matched_rna = {}
+        for r in dico_matched_rna:
+            dico_matched_rna_r = compute_pair_folder(
+                dico_matrix_transform,
+                final_spots_detection,
+                scale_z_x_y=np.array([270, 108, 108]),
+                max_distance=1000,
+                ref_round=r,
+                mean_substraction=False,
+                plot_hist=False,
+                path_folder_save_plot=path_folder_save_plot
+            )
+            all_dico_matched_rna[r] = dico_matched_rna_r
+
+    if args.pairing:
+        ref_round = "r1"
+        pos_list = list(dico_matched_rna[list(dico_matched_rna.keys())[0]].keys())
+        nb_rna_match_aggregated = []
+        percentage_rna_match_aggregated = []
+        median_relocalization_distance_aggregated = []
+        for pos in pos_list:
+            nb_rna_match = []
+            percentage_rna_match = []
+            median_relocalization_distance = []
+            x_list = []
+            round_list_sorted = sorted(list(dico_matched_rna.keys()), key=lambda kv: int(kv[1:]))[:-1]
+            for round in round_list_sorted:
+                if len(dico_matched_rna[round][pos]) == 0:
+                    continue
+                x_list.append(round)
+                nb_rna_match.append(len(dico_matched_rna[round][pos]['list_distance']))
+                ref_round = dico_matched_rna[round][pos]['ref_round']
+                percentage_rna_match.append(len(dico_matched_rna[round][pos]['list_distance'])
+                                    /
+                                    len(dico_matched_rna[ref_round][pos]['list_distance']) * 100)
+                median_relocalization_distance.append(np.median(dico_matched_rna[round][pos]['list_distance']))
+
+            fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+            fig.suptitle(f'median_relocalization_distance, reference is {ref_round}', fontsize=30, x=0.1, ha='left')
+            ax.plot(x_list[1:], median_relocalization_distance[1:])
+            ax.set_ylabel("median relocalization distance  in [nm]", fontsize=18)
+            ax.set_xlabel("round", fontsize=18)
+            fig.savefig(path_folder_save_plot + "/" + f'median_relocalization_distance_reference_{ref_round}_{pos}')
+
+            plt.show()
+
+            fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+            fig.suptitle(f'percentage_rna_match, reference is {ref_round}_{pos}', fontsize=30, x=0.1, ha='left')
+            ax.plot(x_list, percentage_rna_match)
+            ax.set_ylabel(f"percentage of rna colocalize from {ref_round}_{pos}", fontsize=18)
+            ax.set_xlabel("round", fontsize=18)
+
+            ax.set_ylim(ymin=0)
+            fig.savefig(path_folder_save_plot + "/" + f'percentage_rna_match_reference_is_{ref_round}_{pos}')
+            plt.show()
+
+            fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+            fig.suptitle(f'nb_rna_match, reference is {ref_round}_{pos}', fontsize=30, x=0.1, ha='left')
+            ax.plot(x_list, nb_rna_match)
+            ax.set_ylabel(f"number of rna match  colocalize from {ref_round}_{pos}", fontsize=18)
+            ax.set_xlabel("round", fontsize=18)
+            ax.set_ylim(ymin=0)
+            fig.savefig(path_folder_save_plot + "/" + f'nb_rna_match_{ref_round}_{pos}')
+            plt.show()
+
+            nb_rna_match_aggregated.append(nb_rna_match)
+            percentage_rna_match_aggregated.append(percentage_rna_match)
+            median_relocalization_distance_aggregated.append(median_relocalization_distance)
+
+        nb_rna_match_aggregated = np.sum(nb_rna_match_aggregated, axis = 0)
+        percentage_rna_match_aggregated = np.mean(np.array(percentage_rna_match_aggregated), axis = 0)
+        median_relocalization_distance_aggregated = np.mean(median_relocalization_distance_aggregated, axis = 0)
+
+
+        fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+        fig.suptitle(f'median_relocalization_distance, reference is {ref_round}', fontsize=30, x=0.1, ha='left')
+        ax.plot(x_list[1:], median_relocalization_distance_aggregated[1:])
+        ax.set_ylabel("median relocalization distance  in [nm]", fontsize=18)
+        ax.set_xlabel("round", fontsize=18)
+        fig.savefig(path_folder_save_plot + "/" + f'aggregated_median_relocalization_distance_reference_{ref_round}')
+
+        plt.show()
+
+        fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+        fig.suptitle(f' aggregated, percentage_rna_match, reference is {ref_round}', fontsize=30, x=0.1, ha='left')
+        ax.plot(x_list, percentage_rna_match_aggregated)
+        ax.set_ylabel(f"aggregated, percentage of rna colocalize from {ref_round} ", fontsize=18)
+        ax.set_xlabel("round", fontsize=18)
+        ax.set_ylim(ymin=0)
+        fig.savefig(path_folder_save_plot + "/" + f'aggregated_percentage_rna_match_reference_is_{ref_round}')
+        plt.show()
+
+        fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+        fig.suptitle(f' aggregated, nb_rna_match, reference is {ref_round}', fontsize=30, x=0.1, ha='left')
+        ax.plot(x_list, nb_rna_match_aggregated)
+        ax.set_ylabel(f"number of rna match  colocalize from {ref_round}", fontsize=18)
+        ax.set_xlabel("round", fontsize=18)
+        ax.set_ylim(ymin=0)
+        fig.savefig(path_folder_save_plot + "/" + f'aggregated_nb_rna_match_{ref_round}')
+        plt.show()
 
 
 
-##########  plot snr / intensité
+
+    ###### plot pair rna
+
+    if args.pairing_plots_spots:
+        plot_beads_matching_image_folder(
+            first_regex_check="r",
+            channel="ch0",
+            folder_patho="/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3/",
+            psf="",
+            min_distance="",
+            round_source="r1",
+            dico_transform_spots=all_dico_matched_rna,
+            final_spots_detection=final_spots_detection,
+            radius=6,
+            linewidth=1,
+            fill=False,
+            figsize=(20, 20),
+            fontsize_legend=8,
+            plot_mode="rna",
+            rescale=False,
+            name_file = "spots")
+
+
+    ########### compute registation with phase corelation
+
+
+    ## compute the number of pair RNA per round
+
+
+
+    ##########  plot snr / intensité
 
 
 
 
-######## plot precision de co-localisation
+    ######## plot precision de co-localisation
 
 
-### compute supixel
+    ### compute supixel
