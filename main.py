@@ -189,8 +189,6 @@ if __name__ == '__main__':
         dico_matrix_transform = np.load(
             args.rounds_folder + f"/dico_matrix_transform{tuple(args.spot_radius_bead)}.npy",
             allow_pickle=True).item()
-
-
         register_seg_mask_folder(path_rounds_folder=args.rounds_folder,
                                  mask_folder_name="cyto_mask2D_3dim",
                                  ref_round=args.ref_round,
@@ -231,8 +229,8 @@ if __name__ == '__main__':
 
         np.save(args.rounds_folder + f"/first_spots_detection{tuple(args.spot_radius_bead)}",
                 first_spots_detection)
-        if False: #use averge detection to fix threshold
 
+        if False: #use averge detection to fix threshold
             first_spots_detection = np.load(args.rounds_folder + f"/first_spots_detection{tuple(args.spot_radius_bead)}.npy",
                                             allow_pickle="True").item()
             dico_ref_nb_spot_per_position = get_reference_dico(
@@ -255,9 +253,7 @@ if __name__ == '__main__':
                 spot_radius = tuple(args.spot_radius_rna),
                 mode = "bead")
             np.save(args.rounds_folder + f"/final_spots_detection{tuple(args.spot_radius_bead)}", final_spots_detection)
-
         else:
-
             np.save(args.rounds_folder + f"/final_spots_detection{tuple(args.spot_radius_bead)}", first_spots_detection)
 
 
