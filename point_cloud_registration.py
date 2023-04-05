@@ -10,6 +10,10 @@ import numpy as np
 from sklearn.metrics import mean_absolute_error, median_absolute_error
 import bigfish
 from bigfish import multistack
+from utils.transform import apply_rigid_transform, rigid_transform_3D
+from tqdm import tqdm
+from pathlib import Path
+import tifffile
 ################### pair two point cloud with CPD
 
 
@@ -21,21 +25,16 @@ def compute_transformation_matrix_folder(
     voxel_size = [0.3, 0.103, 0.103],
     scale = None, ## for old method
     max_dist = 0.5,
-    first_regex_check = 'r',
-    method  = "old"):
+    first_regex_check = 'r'):
     """
-
     Args:
         dico_detection:
         transform_method:
         voxel_size:
         max_dist:
         first_regex_check:
-
     Returns:
-
     """
-    method in ['old', 'new']
 
     dico_matrix_transform = {}
     dico_matrix_transform_json = {}
@@ -66,51 +65,39 @@ def compute_transformation_matrix_folder(
                     dico_matrix_transform[source_folder][target_folder][pos0] = {}
                     bead_subpixel0 = dico_folder_round0[pos0]["subpixel_spots"]
                     bead_subpixel1 = dico_folder_round1[pos0]["subpixel_spots"]
-
                     if len(bead_subpixel0) == 2: #I dont understadn the second return of fit_subpixel
                         bead_subpixel0 = bead_subpixel0[0]
                     if len(bead_subpixel1) == 2: #I dont understadn the second return of fit_subpixel
                         bead_subpixel1 = bead_subpixel1[0]
 
-                    if method == 'new':
-                        R, t, s, error_before_transformation, error_after_transformation,  spots_0_colocalized, spots_1_colocalized,  new_spots_1_colocalized = compute_rotation_translation(
-                            sub_sp0 = bead_subpixel0,
-                                                     sub_sp1 = bead_subpixel1,
+
+                    R, t, s, error_before_transformation, error_after_transformation, \
+                        spots_0_colocalized, spots_1_colocalized, new_spots_1_colocalized = compute_rotation_translation_icp(
+                                                     sp0 = bead_subpixel0,
+                                                     sp1 =  bead_subpixel1,
+                                                     method_pairing="icp",
                                                      transform_method=transform_method,
-                                                     voxel_size=voxel_size,
-                                                     max_dist=max_dist)
+                                                     radii=[5, 60, 60],
+                                                     real_threshold_nn=np.array([0.5, 0.5, 0.5]),
+                                                     scale=scale,
+                                                     min_bead=4
+                    )
+
+                    if error_before_transformation is not None:
+                        print(f'error_before_transformation in nm {error_before_transformation * np.array([270, 108, 108])}' )
+                        print(f'error_after_transformation in nm {error_after_transformation * np.array([270, 108, 108])}' )
+                        print()
                     else:
-
-                        R, t, s, error_before_transformation, error_after_transformation, \
-                            spots_0_colocalized, spots_1_colocalized, new_spots_1_colocalized = compute_rotation_translation_icp(
-                                                         sp0 = bead_subpixel0,
-                                                         sp1 =  bead_subpixel1,
-                                                         method_pairing="icp",
-                                                         transform_method="affine_cpd",
-                                                         radii=[5, 60, 60],
-                                                         real_threshold_nn=np.array([0.5, 0.5, 0.5]),
-                                                         scale=scale,
-                                                         min_bead=4)
-                        if error_before_transformation is not None:
-                            print(f'error_before_transformation in nm {error_before_transformation * np.array([270, 108, 108])}' )
-                            print(f'error_after_transformation in nm {error_after_transformation * np.array([270, 108, 108])}' )
-                            print()
-                        else:
-                            print(f"Fail in {source_folder}_{target_folder}_{pos0}")
-
-
-
-
-
-                    dico_matrix_transform[source_folder][target_folder][pos0]['R'] = R
-                    dico_matrix_transform[source_folder][target_folder][pos0]['t'] = t
-                    dico_matrix_transform[source_folder][target_folder][pos0]['s'] = s
-                    dico_matrix_transform[source_folder][target_folder][pos0]['error_before_transformation'] = error_before_transformation
-                    dico_matrix_transform[source_folder][target_folder][pos0]['error_after_transformation'] = error_after_transformation
-                    dico_matrix_transform[source_folder][target_folder][pos0]['spots_0_colocalized'] = spots_0_colocalized
-                    dico_matrix_transform[source_folder][target_folder][pos0]['spots_1_colocalized'] = spots_1_colocalized
-                    dico_matrix_transform[source_folder][target_folder][pos0]['new_spots_1_colocalized'] = new_spots_1_colocalized
-                    dico_matrix_transform[source_folder][target_folder][pos0]['transform_method'] = transform_method
+                        print(f"Fail in {source_folder}_{target_folder}_{pos0}")
+                dico_matrix_transform[source_folder][target_folder][pos0]['R'] = R
+                dico_matrix_transform[source_folder][target_folder][pos0]['t'] = t
+                dico_matrix_transform[source_folder][target_folder][pos0]['s'] = s
+                dico_matrix_transform[source_folder][target_folder][pos0]['error_before_transformation'] = error_before_transformation
+                dico_matrix_transform[source_folder][target_folder][pos0]['error_after_transformation'] = error_after_transformation
+                dico_matrix_transform[source_folder][target_folder][pos0]['spots_0_colocalized'] = spots_0_colocalized
+                dico_matrix_transform[source_folder][target_folder][pos0]['spots_1_colocalized'] = spots_1_colocalized
+                dico_matrix_transform[source_folder][target_folder][pos0]['new_spots_1_colocalized'] = new_spots_1_colocalized
+                dico_matrix_transform[source_folder][target_folder][pos0]['transform_method'] = transform_method
     return dico_matrix_transform
 
 
@@ -156,6 +143,12 @@ def compute_rotation_translation(sub_sp0,
         s = None
         new_spots_1_colocalized = reg.transform_point_cloud(spots_1_colocalized)
 
+    elif transform_method == "numpy_rigid":
+        from utils.transform import rigid_transform_3D
+        R, t  = rigid_transform_3D(spots_1_colocalized, spots_0_colocalized)
+        s = None
+
+
     else:
         raise(Exception(f''))
     error_after_transformation = mean_absolute_error(spots_0_colocalized,
@@ -189,6 +182,8 @@ def compute_rotation_translation(sub_sp0,
         R, t = reg.get_registration_parameters()
         s = None
         new_spots_1_colocalized_bis = reg.transform_point_cloud(spots_1_colocalized_bis)
+    elif transform_method == "numpy_rigid":
+            new_spots_1_colocalized_bis = (R @ spots_1_colocalized_bis.T + t).T
 
     else:
         raise(Exception(f''))
@@ -214,6 +209,9 @@ from pyoints import (registration,  # storage,; Extent,; filters,; normals,
 
 
 def compute_first_icp(sp0, sp1, radii=[3, 30, 30]):
+    from pyoints import (registration,  # storage,; Extent,; filters,; normals,
+                         transformation)
+
     """
     compute the candidate pair a beads using an ICP
 
@@ -239,53 +237,6 @@ def compute_first_icp(sp0, sp1, radii=[3, 30, 30]):
     return sp0_pair, sp1_pair, T_dict, report
 
 
-
-def rigid_transform_3D(A, B):
-    """
-    # https://github.com/nghiaho12/rigid_transform_3D
-    # Input: expects 3xN matrix of points
-    # Returns R,t
-    # R = 3x3 rotation matrix
-    # t = 3x1 column vector
-    # then R @ A.T) + t).T is equal to B
-    :param A:
-    :type A:
-    :param B:
-    :type B:
-    :return:
-    :rtype:
-    """
-
-    assert A.shape == B.shape
-    num_rows, num_cols = A.shape
-    if num_rows != 3:
-        raise Exception(f"matrix A is not 3xN, it is {num_rows}x{num_cols}")
-    num_rows, num_cols = B.shape
-    if num_rows != 3:
-        raise Exception(f"matrix B is not 3xN, it is {num_rows}x{num_cols}")
-    # find mean column wise
-    centroid_A = np.mean(A, axis=1)
-    centroid_B = np.mean(B, axis=1)
-    # ensure centroids are 3x1
-    centroid_A = centroid_A.reshape(-1, 1)
-    centroid_B = centroid_B.reshape(-1, 1)
-    # subtract mean
-    Am = A - centroid_A
-    Bm = B - centroid_B
-    H = Am @ np.transpose(Bm)
-    # sanity check
-    # if linalg.matrix_rank(H) < 3:
-    #    raise ValueError("rank of H = {}, expecting 3".format(linalg.matrix_rank(H)))
-    # find rotation
-    U, S, Vt = np.linalg.svd(H)
-    R = Vt.T @ U.T
-    # special reflection case
-    if np.linalg.det(R) < 0:
-        print("det(R) < R, reflection detected!, correcting for it ...")
-        Vt[2, :] *= -1
-        R = Vt.T @ U.T
-    t = -R @ centroid_A + centroid_B
-    return R, t
 
 
 def compute_pair_icp(sp0, sp1, radii=[6,60,60],  real_threshold_nn =  [0.5, 0.5, 0.5], min_bead = 4):
@@ -337,6 +288,9 @@ def compute_pair_icp(sp0, sp1, radii=[6,60,60],  real_threshold_nn =  [0.5, 0.5,
 
     return sub_sp0_pair, sub_sp1_pair, sub_sp0_pair_remove, sub_sp1_pair_remove, error_before_reduction
 
+
+
+
 def compute_rotation_translation_icp(sp0,
                                      sp1,
                                      method_pairing = "icp",
@@ -360,7 +314,6 @@ def compute_rotation_translation_icp(sp0,
         radii = np.array(radii) * scale
         real_threshold_nn = real_threshold_nn * scale
     assert method_pairing in ["icp"]
-    assert transform_method in ["affine_cpd", "rigid_cpd",  'rigid', "all"]
     if method_pairing == "icp":
         sub_sp0_pair, sub_sp1_pair, sub_sp0_pair_remove, sub_sp1_pair_remove, error_before_reduction = compute_pair_icp(sp0,
                                                                                                                         sp1,
@@ -375,33 +328,121 @@ def compute_rotation_translation_icp(sp0,
         return None, None, None, None, None, None, None, None
     # recompute optimal transformation with the real pair
     if transform_method == 'rigid':
+        from utils.transform import rigid_transform_3D, apply_rigid_transform
+
         R, t = rigid_transform_3D(sub_sp1_pair.T, sub_sp0_pair.T)
         error_before_transformation = mean_absolute_error(sub_sp0_pair, sub_sp1_pair, multioutput='raw_values')
-        error_after = mean_absolute_error(((R @ sub_sp1_pair.T) + t).T,
+        new_sub_sp1_pair = apply_rigid_transform(sp = sub_sp1_pair, R=R, t=t)
+        error_after = mean_absolute_error(new_sub_sp1_pair,
                                           sub_sp0_pair,
                                           multioutput='raw_values')
+        print(transform_method)
         s = None
 
-    if transform_method == 'affine_cpd':
+    elif transform_method == 'affine_cpd':
         reg = AffineRegistration(**{'X': sub_sp0_pair, 'Y': sub_sp1_pair})
         reg.register()
         R, t = reg.get_registration_parameters() #some time it does not work especially when there is not enought bead
         error_before_transformation = mean_absolute_error(sub_sp0_pair, sub_sp1_pair, multioutput='raw_values')
-        error_after = np.mean(np.abs(sub_sp0_pair  - reg.transform_point_cloud(sub_sp1_pair)), axis = 0)
+        new_sub_sp1_pair = reg.transform_point_cloud(sub_sp1_pair)
+        error_after = np.mean(np.abs(sub_sp0_pair  - new_sub_sp1_pair), axis = 0)
         s = None
-    if transform_method == 'rigid_cpd':
+    elif transform_method == 'rigid_cpd':
         reg = RigidRegistration(**{'X': sub_sp0_pair, 'Y': sub_sp1_pair})
         reg.register()
         R, t, s = reg.get_registration_parameters()
         error_before_transformation = mean_absolute_error(sub_sp0_pair, sub_sp1_pair, multioutput='raw_values')
-        error_after = np.mean(np.abs(sub_sp1_pair  - reg.transform_point_cloud(sub_sp1_pair)), axis = 0)
+        new_sub_sp1_pair = reg.transform_point_cloud(sub_sp1_pair)
+        error_after = np.mean(np.abs(sub_sp1_pair  - new_sub_sp1_pair), axis = 0)
+
+    else:
+        raise ValueError(f"transform_method {transform_method} should be in ['rigid', 'affine_cpd', 'rigid_cpd']")
+
+
+
     print("error before: %s, error after: %s" % (str(error_before_transformation), str(error_after)))
     print("orignial potential pair: %s, final number of pair: %s" % (
     str(min(len(sp0), len(sp1))), str(len(sub_sp1_pair))))
-    return R, t, s, error_before_transformation, error_after, sub_sp0_pair, sub_sp1_pair,  reg.transform_point_cloud(sub_sp1_pair)
+    return R, t, s, error_before_transformation, error_after, sub_sp0_pair, sub_sp1_pair,  new_sub_sp1_pair
 
 
 
+#### registration of cytoplams segmentations mask
+
+
+def register_seg_mask(mask_2D, R, t, s = None, transform_method = "rigid"):
+    """
+    :param mask_2D: reference mask shape [1,X,Y]
+    :param mask: mask to register
+    :param R: rotation matrix
+    :param t: translation vector
+    :return: registered mask
+    """
+    from utils.transform import apply_rigid_transform
+    ## get cordiante of the mask
+    coord_mask_ref = np.where(mask_2D > 0)
+    coord_mask_ref = np.array([coord for coord in zip(coord_mask_ref[0], coord_mask_ref[1], coord_mask_ref[2])])
+
+    if transform_method == "rigid":
+        coord_mask_target = apply_rigid_transform(coord_mask_ref, R, t)
+        coord_mask_target.round()
+        coord_mask_target = coord_mask_target.astype(int)
+    else:
+        raise ValueError(f"transform_method {transform_method} is not implemented yet for mask registration")
+
+
+
+    mask_2D_target = np.zeros(mask_2D.shape)
+    for coord_index in range(len(coord_mask_target)):
+        coord = coord_mask_target[coord_index]
+        if coord[1] < mask_2D.shape[1] and coord[2] < mask_2D.shape[2] and coord[1] >= 0 and coord[2] >= 0:
+            original_coord = coord_mask_ref[coord_index]
+            mask_2D_target[0, coord[1], coord[2]] = mask_2D[0, original_coord[1], original_coord[2]]
+    return mask_2D_target
+
+
+
+def register_seg_mask_folder(path_rounds_folder = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3",
+                             mask_folder_name = "cyto_mask2D_3dim",
+                             ref_round = 'r1',
+                             dico_matrix_transform = None ,#np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test_folder/test3/dico_matrix_transform(800, 600, 600).npy",allow_pickle=True).item(),
+                             transform_method = "rigid",
+                         round_first_regex = "r",
+                         fish_channel = "ch0",
+                             ):
+    ### load mask_ref for each position and the rotation translation matrix
+    dico_ref_mask = {}
+    if path_rounds_folder[-1] != "/":
+        path_rounds_folder += "/"
+    for path_mask in Path(path_rounds_folder + ref_round + "/" + mask_folder_name).glob(f'{round_first_regex}*'):
+            image_name = str(path_mask).split('/')[-1]
+            pos = image_name.split("_")[1]
+            ref_mask = tifffile.imread(path_mask)
+            dico_ref_mask[pos] = ref_mask
+    for path_round in tqdm(Path(path_rounds_folder).glob(f'{round_first_regex}*')):
+        round_name = str(path_round).split("/")[-1]
+        if round_name == ref_round:
+            continue
+        Path(str(path_rounds_folder) + round_name + "/" + mask_folder_name).mkdir(exist_ok=True)
+        for path_mask in path_round.glob(f'{round_first_regex}*{fish_channel}*'):
+            print(str(path_mask).split('/')[-1])
+            image_name = str(path_mask).split('/')[-1]
+            pos = image_name.split("_")[1]
+            mask_2D = dico_ref_mask[pos]
+            R = dico_matrix_transform[round_name][ref_round][pos]['R']
+            t = dico_matrix_transform[round_name][ref_round][pos]['t']
+            s = dico_matrix_transform[round_name][ref_round][pos]['s']
+            mask_2D_target = register_seg_mask(mask_2D, R, t, s=s,
+                                               transform_method=transform_method)
+            tifffile.imsave(path_rounds_folder + round_name + "/" + mask_folder_name + "/" + image_name, mask_2D_target)
+
+
+
+
+
+
+def apply_rigid_transform(sp, R, t):
+    return ((R @ sp.T) + t).T
 
 
 #%%

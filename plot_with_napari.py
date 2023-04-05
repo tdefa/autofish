@@ -14,8 +14,11 @@ if __name__ == '__main__':
     final_spots_detection = np.load("/media/tom/T7/2023-01-19-PAPER-20-rounds/test/final_spots_detection.npy",
             allow_pickle=True).item()
 
-    im_fish = tifffile.imread("/media/tom/T7/2023-01-19-PAPER-20-rounds/test2/r1/r1_pos0_ch0.tif")
-    spots_list = final_spots_detection['r1']['pos0']["raw_spots"]
+    #im_fish = tifffile.imread("/media/tom/T7/2023-01-19-PAPER-20-rounds/test2/r1/r1_pos0_ch0.tif")
+    #spots_list = final_spots_detection['r1']['pos0']["raw_spots"]
+    path_im_fish = '/media/tom/T7/2023-01-19-PAPER-20-rounds/round_impair/r1/dw_r1_pos0_ch0.tif'
+    im_fish = tifffile.imread(path_im_fish)
+    spots_list = np.load("spotss.npy")
     viewer = napari.Viewer()
     viewer.add_image(im_fish, name='fish')
     if len(spots_list) > 0:

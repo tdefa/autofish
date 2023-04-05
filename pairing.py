@@ -91,6 +91,8 @@ def compute_pair_folder(
         plot_hist = True,
         path_folder_save_plot = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test3/histogram"
         ):
+
+
     Path(path_folder_save_plot).mkdir(parents=True, exist_ok=True)
     dico_matched_rna = {}
 
@@ -116,6 +118,16 @@ def compute_pair_folder(
                 sp1 = reg.transform_point_cloud(sp1)
                 sp0_ref = sp0_ref * scale_z_x_y
                 sp1 = sp1 * scale_z_x_y
+            elif transform_method == "rigid":
+                from utils.transform import apply_rigid_transform
+                sp0_ref = np.array(sp0_ref)
+
+                sp1 = np.array(sp1)
+                sp1 = apply_rigid_transform(sp1, R_1_2, t_1_2)
+                sp0_ref = sp0_ref * scale_z_x_y
+                sp1 = sp1 * scale_z_x_y
+            else:
+                raise Exception("transform_method not implemented")
 
             list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order, sp1_pair_order, list_distance =  pairit(sp0_ref=sp0_ref,
                                                                                                                           sp1=sp1,
