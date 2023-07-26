@@ -46,7 +46,7 @@ plt.rc_context({"axes.labelsize" : 45,})
 
 
 
-def pairit(sp0_ref, sp1, max_distance = None):
+def compute_pair(sp0_ref, sp1, max_distance = None):
     list_couple_index_sp0_ref = []
     list_couple_index_sp1 = []
     sp0_ref_pair_order = []
@@ -78,7 +78,83 @@ def pairit(sp0_ref, sp1, max_distance = None):
     print(len(list_distance))
     return list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order,  sp1_pair_order, list_distance
 
+pairit = compute_pair
 
+def compute_pair_folder(
+
+        final_spots_detection,
+        scale_z_x_y=np.array([270, 108, 108]),
+        max_distance=1000,
+        ref_round = "r1",
+        mean_substraction = True,
+        plot_hist = True,
+        path_folder_save_plot = "/media/tom/T7/2023-01-19-PAPER-20-rounds/test3/histogram"
+        ):
+
+
+    Path(path_folder_save_plot).mkdir(parents=True, exist_ok=True)
+    dico_matched_rna = {}
+
+    for round in final_spots_detection:
+        dico_matched_rna[round] = {}
+        for pos in final_spots_detection[round]:
+            dico_matched_rna[round][pos] = {}
+            sp0_ref = final_spots_detection[ref_round][pos]['subpixel_spots'][0]
+            sp1 = final_spots_detection[round][pos]['subpixel_spots'][0]
+            R_1_2 = dico_matrix_transform[ref_round][round][pos]['R']
+            t_1_2 = dico_matrix_transform[ref_round][round][pos]['t']
+            s_1_2 = dico_matrix_transform[ref_round][round][pos]['s']
+            transform_method = dico_matrix_transform[ref_round][round][pos]['transform_method']
+            if t_1_2 is None:
+                continue
+
+            if transform_method == "affine_cpd":
+                reg = AffineRegistration(**{'X': sp0_ref, 'Y': sp1})
+                reg.B = R_1_2
+                reg.t = t_1_2
+                sp0_ref = np.array(sp0_ref)
+                sp1 = np.array(sp1)
+                sp1 = reg.transform_point_cloud(sp1)
+                sp0_ref = sp0_ref * scale_z_x_y
+                sp1 = sp1 * scale_z_x_y
+            elif transform_method == "rigid":
+                from utils.transform import apply_rigid_transform
+                sp0_ref = np.array(sp0_ref)
+
+                sp1 = np.array(sp1)
+                sp1 = apply_rigid_transform(sp1, R_1_2, t_1_2)
+                sp0_ref = sp0_ref * scale_z_x_y
+                sp1 = sp1 * scale_z_x_y
+            else:
+                raise Exception("transform_method not implemented")
+
+            list_couple_index_sp0_ref, list_couple_index_sp1, sp0_ref_pair_order, sp1_pair_order, list_distance =  pairit(sp0_ref=sp0_ref,
+                                                                                                                          sp1=sp1,
+                                                                                                                          max_distance=max_distance)
+
+            if mean_substraction:
+                raise(Exception('mean_substraction not implemented yet'))
+
+            sp0_ref_pair_order = np.array(sp0_ref_pair_order) / scale_z_x_y
+            sp1_pair_order = np.array(sp1_pair_order) / scale_z_x_y
+
+            dico_matched_rna[round][pos]["list_couple_index_sp0_ref"] = list_couple_index_sp0_ref
+            dico_matched_rna[round][pos]["list_couple_index_sp1"] = list_couple_index_sp1
+            dico_matched_rna[round][pos]["sp0_ref_pair_order"] = sp0_ref_pair_order
+            dico_matched_rna[round][pos]["sp1_pair_order"] = sp1_pair_order
+            dico_matched_rna[round][pos]["list_distance"] = list_distance
+            dico_matched_rna[round][pos]["ref_round"] = ref_round
+
+
+            if plot_hist:
+
+                fig, ax = plt.subplots(figsize=(16, 10))    # plotting density plot for carat using distplot()
+                fig.suptitle(f'{ref_round}_{round}_{pos}_median_{np.median(list_distance)}', fontsize=20, x =0.1, ha='left')
+                sns.kdeplot(x=list_distance, cumulative=False)
+                ax.set_ylim(ymin=0)
+                ax.set_xlim(left = 0, right= max_distance)
+                fig.savefig(path_folder_save_plot + "/" + f"{ref_round}_{round}_{pos}")
+    return dico_matched_rna
 
 
 def compute_pair_folder(
