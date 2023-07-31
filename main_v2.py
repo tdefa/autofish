@@ -10,12 +10,7 @@ from tqdm import tqdm
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-
-
-
-
-
-
+import seaborn as sns
 
 if __name__ == "__main__":
 
@@ -226,61 +221,79 @@ if __name__ == "__main__":
 
     ##" plot intensity variation per spots position per round
 
-    dico_spots_not_registered = np.load('/media/tom/Transcend/autofish/2023-07-04_AutoFISH-SABER/dict_spots.npy',
+
+
+    import seaborn as sns
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import tifffile
+    import numpy as np
+    from pathlib import Path
+    from tqdm import tqdm
+    import os
+    import re
+    dico_spots_not_registered = np.load('/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/18jully_dico_spots_local_detection0_r_mask_artefact0_1.3_remove_non_sym0.npy',
                                         allow_pickle=True).item()
 
 
 
 
-    dict_spots_registered_df_with_cell = np.load("/media/tom/Transcend/autofish/2023-07-04_AutoFISH-SABER/dict_spots_registered_df_r1_with_cell.npy",
+    dict_spots_registered_df_with_cell = np.load("/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/dict_spots_registered_df_r1_with_cell.npy",
                                                  allow_pickle=True).item()
 
-    dict_translation = np.load('/media/tom/Transcend/autofish/2023-07-04_AutoFISH-SABER/dict_translation_ref_r1.npy',
+    dict_translation = np.load('/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/dict_translation_ref_r1.npy',
                                  allow_pickle=True).item()
     ref_round = 'r1'
 
-    folder_of_rounds = "/media/tom/Transcend/autofish/2023-07-04_AutoFISH-SABER/"
-    path_folder_save_plot = "/media/tom/Transcend/autofish/2023-07-04_AutoFISH-SABER/plots_intensity"
+    folder_of_rounds = "/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/"
+    path_folder_save_plot = "/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/plots_intensity"
     Path(path_folder_save_plot).mkdir(parents=True, exist_ok=True)
     pos = 'pos0'
-    df_spots = dict_spots_registered_df_with_cell[pos]
-    sp0_ref = df_spots[df_spots['round'] == ref_round]
-    sp0_ref = df_spots[df_spots['round'] == ref_round]
-    df_matching = pd.DataFrame(columns=df_spots.columns)
-    sp0_ref = list(zip(sp0_ref['z'], sp0_ref['y'], sp0_ref['x']))
-
+    round_to_take =['r0','r1', "r2", "r5" ]
+    dico_pos_RNA_intensity = {}
 
     #round_to_take = ["r0", "r2",  "r4", "r8", 'r10']
     #round_to_take = ["r0","r1", "r3",  "r4","r7", "r9"]
-    empty_round = ["r4"]
-    dico_pos_RNA_intensity = {}
-    for round_name in tqdm(round_to_take):
+    for r in round_to_take:
+        dico_pos_RNA_intensity[r] = []
+    list_position = list(dict_spots_registered_df_with_cell.keys())
+    for pos in tqdm(list_position):
 
-        if round_name == ref_round:
-            x_translation = 0
-            y_translation = 0
-        else:
-            x_translation = dict_translation[pos][ref_round][round_name]['x_translation']
-            y_translation = dict_translation[pos][ref_round][round_name]['y_translation']
-
-        sp_df = df_spots[df_spots['round'] == ref_round]
-
-        sp0_ref = list(zip(sp_df['z'], sp_df['y'], sp_df['x']))
-        translated_spots = sp0_ref + np.array([0, y_translation, x_translation])
+        df_spots = dict_spots_registered_df_with_cell[pos]
+        sp0_ref = df_spots[df_spots['round'] == ref_round]
+        sp0_ref = df_spots[df_spots['round'] == ref_round]
+        df_matching = pd.DataFrame(columns=df_spots.columns)
+        sp0_ref = list(zip(sp0_ref['z'], sp0_ref['y'], sp0_ref['x']))
 
 
-        fish_signal = tifffile.imread(Path(folder_of_rounds) / f"{round_name}/{round_name}_{pos}_ch0.tif")
-        z_range = range(0, fish_signal.shape[0])
-        y_range = range(0, fish_signal.shape[1])
-        x_range = range(0, fish_signal.shape[2])
-        intensity_list = []
-        for spot in translated_spots:
-            z, y, x = round(spot[0]), round(spot[1]), round(spot[2])
-            if z in z_range and y in y_range and x in x_range:
-                intensity_list.append(fish_signal[z, y, x])
-        dico_pos_RNA_intensity[round_name] = intensity_list
 
-        print(round_name, np.mean(intensity_list))
+        for round_name in tqdm(round_to_take):
+
+            if round_name == ref_round:
+                x_translation = 0
+                y_translation = 0
+            else:
+                x_translation = dict_translation[pos][ref_round][round_name]['x_translation']
+                y_translation = dict_translation[pos][ref_round][round_name]['y_translation']
+
+            sp_df = df_spots[df_spots['round'] == ref_round]
+
+            sp0_ref = list(zip(sp_df['z'], sp_df['y'], sp_df['x']))
+            translated_spots = sp0_ref + np.array([0, y_translation, x_translation])
+
+
+            fish_signal = tifffile.imread(Path(folder_of_rounds) / f"{round_name}/{round_name}_{pos}_ch0.tif")
+            z_range = range(0, fish_signal.shape[0])
+            y_range = range(0, fish_signal.shape[1])
+            x_range = range(0, fish_signal.shape[2])
+            intensity_list = []
+            for spot in translated_spots:
+                z, y, x = round(spot[0]), round(spot[1]), round(spot[2])
+                if z in z_range and y in y_range and x in x_range:
+                    intensity_list.append(fish_signal[z, y, x])
+            dico_pos_RNA_intensity[round_name] += intensity_list
+
+            print(round_name, np.mean(intensity_list))
 
         #list_round_sorted =sorted(list(dico_pos_RNA_intensity.keys()), key=lambda kv: int(kv[1:]))[:]
 
@@ -295,7 +308,7 @@ if __name__ == "__main__":
     #colors_list_random_exa = ['#FF0000', '#FFA500', '#FFFF00', '#008000', '#0000FF', '#4B0082', '#EE82EE'
     #                            , '#FFC0CB', '#000000', '#808080', '#808000', '#00FFFF', '#00FF00', '#800000',
     #                            '#800080', '#008080', '#000080', '#FF00FF', '#C0C0C0', '#FFD700', '#A52A2A', '#00FA9A']
-    colors_list_random_exa = ["grey", "blue", "red", "grey", "blue", "red"]
+    colors_list_random_exa = ["grey", "blue", "grey", "blue"]
     for patch, color in zip(bplot1 ['boxes'], colors_list_random_exa):
         patch.set_facecolor(color)
 
@@ -309,7 +322,7 @@ if __name__ == "__main__":
     ax.set_xticklabels(list_round_sorted, fontsize=24)
 
     ax.set_ylabel(f"intensity ", fontsize=24)
-    ax.set_title(f" round at position {pos}", fontsize=35)
+    ax.set_title(f" round poll for all positions", fontsize=35)
     ax.get_figure().savefig(path_folder_save_plot + "/" + f'ref_round_{ref_round}_{pos}.png')
     plt.show()
 
@@ -318,3 +331,148 @@ if __name__ == "__main__":
         for round_name in list_round_sorted:
             intensity_list  = dico_pos_RNA_intensity[round_name]
             print(round_name, np.mean(intensity_list))
+
+            #list_round_sorted =sorted(list(dico_pos_RNA_intensity.keys()), key=lambda kv: int(kv[1:]))[:]
+
+
+####################################
+# SIGNAL QUALITY PLOT
+####################################
+
+    dico_signal_quality = np.load('/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/dico_signal_quality.npy',
+            allow_pickle=True).item()
+    ## plot medain snr per round
+    path_folder_save_plot   = '/media/tom/Transcend/autofish/2023-06-28_AutoFISH_22rounds/plot_signal_quality'
+    Path(path_folder_save_plot).mkdir(exist_ok=True)
+    ref_round = 'r1'
+    round_list_sorted = sorted(list(dico_signal_quality.keys()), key=lambda kv: int(kv[1:]))[:]
+    #round_list_sorted =['r2',  'r5',  'r8',  'r10']
+    round_list_sorted = ['r3',  'r6',  'r8',  'r10', 'r12', 'r14', 'r16', 'r18', 'r20']
+    aggregated_snr = []
+    dict_median_snr = {}
+    dict_snr = {}
+
+    aggregated_intensity = []
+    dict_median_intensity = {}
+    dict_intensity = {}
+    aggregated_median_background = []
+    dict_median_background = {}
+    dict_background = {}
+
+    for r in round_list_sorted:
+            dict_median_snr[r] = []
+            dict_median_intensity[r] = []
+            dict_median_background[r] = []
+            dict_snr[r] = []
+            dict_intensity[r] = []
+            dict_background[r] = []
+
+
+    for pos in dico_signal_quality[ref_round].keys():
+        median_snr = []
+        median_intensity = []
+        median_background = []
+        for r in round_list_sorted:
+            median_snr.append(np.median(dico_signal_quality[r][pos]['snr']))
+            dict_median_snr[r].append(np.median(dico_signal_quality[r][pos]['snr']))
+            dict_snr[r] = dico_signal_quality[r][pos]['snr']
+        median_intensity = []
+        for r in round_list_sorted:
+            median_intensity.append(np.median(dico_signal_quality[r][pos]['intensity']))
+            dict_median_intensity[r].append(np.median(dico_signal_quality[r][pos]['intensity']))
+            dict_intensity[r] = dico_signal_quality[r][pos]['intensity']
+        for r in round_list_sorted:
+            median_background.append(np.median(dico_signal_quality[r][pos]['background']))
+            dict_median_background[r].append(np.median(dico_signal_quality[r][pos]['background']))
+            dict_background[r] = dico_signal_quality[r][pos]['background']
+
+        fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+        fig.suptitle(f'median_snr_ reference is {ref_round}, pos is {pos}', fontsize=30, x=0.1, ha='left')
+        ax.plot(round_list_sorted, median_snr)
+        ax.set_ylabel("median_snr", fontsize=18)
+        ax.set_xlabel("round", fontsize=18)
+        ax.set_ylim(ymin=0)
+        fig.savefig(Path(path_folder_save_plot) /  f'median_snr_{ref_round}_{pos}')
+        plt.show()
+        aggregated_snr.append(median_snr)
+
+        fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+        fig.suptitle(f'median_intensity, reference is {ref_round}, pos is {pos}', fontsize=30, x=0.1, ha='left')
+        ax.plot(round_list_sorted, median_intensity)
+        ax.set_ylabel("median_intensity value", fontsize=18)
+        ax.set_xlabel("round", fontsize=18)
+        ax.set_ylim(ymin=0)
+        fig.savefig(Path(path_folder_save_plot) /    f'median_intensity{ref_round}_{pos}')
+        plt.show()
+        aggregated_intensity.append(median_intensity)
+
+        aggregated_median_background.append(median_background)
+
+
+
+
+    aggregated_snr = np.mean(np.array(aggregated_snr), axis=0)
+    aggregated_intensity = np.mean(np.array(aggregated_intensity), axis=0)
+    aggregated_median_background = np.mean(np.array(aggregated_median_background), axis=0)
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+
+    ax = sns.boxplot(data=pd.DataFrame(dict_median_snr),
+                     orient='v', ax=ax, color='skyblue')
+    ax.set_ylabel("median_snr value", fontsize=18)
+    fig.suptitle(f'aggregated_snr, reference is {ref_round} aggreagted on all position')
+    ax.set_ylim(ymin=0)
+
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_snr_box_plot')
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+    fig.suptitle(f'aggregated_snr, reference is {ref_round} aggreagted on all position', fontsize=30, x=0.1, ha='left')
+    ax.plot(round_list_sorted, aggregated_snr)
+    ax.set_ylabel("median_snr value", fontsize=18)
+    ax.set_xlabel("round", fontsize=18)
+    ax.set_ylim(ymin=0)
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_snr')
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+    fig.suptitle(f'aggregated_intensity, reference is {ref_round} aggreagted on all position', fontsize=30, x=0.1,
+                 ha='left')
+    ax.plot(round_list_sorted, aggregated_intensity)
+    ax.set_ylabel("median_intensity value", fontsize=18)
+    ax.set_xlabel("round", fontsize=18)
+    ax.set_ylim(ymin=0)
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_intensity')
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+
+    ax = sns.boxplot(data=pd.DataFrame(dict_median_intensity),
+                     orient='v', ax=ax, color='skyblue')
+
+    ax.set_ylabel("median_intensity value", fontsize=18)
+    ax.set_ylim(ymin=0)
+
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_snr_box_plot')
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+    fig.suptitle(f'median background', fontsize=30, x=0.1, ha='left')
+    ax.plot(round_list_sorted, aggregated_median_background)
+    ax.set_ylabel("median_bacground_intensity value", fontsize=18)
+    ax.set_xlabel("round", fontsize=18)
+    ax.set_ylim(ymin=0)
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_median_background')
+    plt.show()
+
+    fig, ax = plt.subplots(figsize=(16, 10))  # plotting density plot for carat using distplot()
+
+    ax = sns.boxplot(data=pd.DataFrame(dict_median_background),
+                     orient='v', ax=ax, color='skyblue')
+    ax.set_ylabel("median_bacground_intensity value", fontsize=18)
+    fig.suptitle(f'median background', fontsize=30, x=0.1, ha='left')
+    fig.savefig(path_folder_save_plot + "/" + f'aggregated_snr_box_plot')
+    ax.set_ylim(ymin=0)
+
+    plt.show()
+
