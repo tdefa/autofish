@@ -1,0 +1,17 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+autofish_analysis/__init__.py
+autofish_analysis/draft.py
+autofish_analysis/main.py
+autofish_analysis/plots.py
+autofish_analysis/registration.py
+autofish_analysis/segmentation.py
+autofish_analysis/split_ndtiff_stack.py
+autofish_analysis/spots_detection.py
+autofish_analysis/stitching.py
+autoimg.egg-info/PKG-INFO
+autoimg.egg-info/SOURCES.txt
+autoimg.egg-info/dependency_links.txt
+autoimg.egg-info/top_level.txt
